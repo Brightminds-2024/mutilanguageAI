@@ -7,14 +7,21 @@ import tempfile
 import os
 import re
 import random
+from streamlit_folium import st_folium
+import folium
 
-# CONFIGURATION
+try:
+    from streamlit_lottie import st_lottie
+    LOTTIE_AVAILABLE = True
+except ImportError:
+    LOTTIE_AVAILABLE = False
+
+# ---- API KEYS (replace with your own for production use!) ----
 GROQ_API_KEY = ""
 GROQ_MODEL = "llama3-70b-8192"
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY") or "66rqaiQNC3XdRL7BZuFMmvnO33bKZNOp2209fmVhPuAe813HEzxjSd0h"
 UNSPLASH_KEY = os.getenv("UNSPLASH_KEY") or ""
-BG_IMAGE_URL = "https://photutorial.com/wp-content/uploads/2023/04/Featured-image-AI-image-generators-by-Midjourney.png"
 
 translator = Translator()
 tts_supported = tts_langs()
@@ -24,108 +31,215 @@ ALL_LANGUAGE_CHOICES = [
     f"{name} ({code}){' (🔊 Voice)' if code in tts_supported else ' (📝 Text)'}"
     for code, name in sorted(translator_supported.items(), key=lambda x: x[1])
 ]
+
 TIP_LIST = [
-    "🌎 Over 200 languages • Enjoy text & voice answers instantly.",
-    "🔊 Voice output enabled for Kannada, Hindi, Tamil and more.",
-    "🖼️ Images fetched from best AI image APIs.",
-    "✨ Try: Explain AI in French, Python basics in Telugu.",
-    "💡 'Copy' any box with a click for instant reuse."
+    "🎨 Enjoy a futuristic UI with animation & soft glow!",
+    "🗺️ See your live city and location right here.",
+    "✨ Try: 'Quantum physics in Kannada', 'Photosynthesis in Telugu'."
 ]
 
 def add_custom_styles():
+    bg_url = "https://image.slidesdocs.com/responsive-images/background/artificial-intelligence-future-technology-illustration-powerpoint-background_78c699b78b__960_540.jpg"
     st.markdown(f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=JetBrains+Mono:wght@500&display=swap');
     body {{
-      background: url('{BG_IMAGE_URL}') no-repeat center center fixed !important;
-      background-size: cover !important; min-height:100vh; font-family:'Montserrat',sans-serif;
+      background: url('{bg_url}') no-repeat center center fixed !important;
+      background-size: cover !important;
+      min-height:100vh;
+      font-family:'Montserrat',sans-serif;
+      position: relative;
+    }}
+    body::after {{
+      content: "";
+      position: fixed;
+      left:0;top:0;width:100vw;height:100vh;z-index:-1;
+      pointer-events: none;
+      background: linear-gradient(110deg, #071824bb 12%, #7166e899 92%);
+      mix-blend-mode: multiply;
+      opacity: 0.88;
     }}
     .stApp {{
-      background: rgba(18,20,41,0.86); min-height:100vh; color:#f4f4f7; box-shadow: 0 0 80px 28px #0e123083 inset; padding-bottom:3vw;
+      background: rgba(17,22,39,0.82);
+      min-height:100vh;
+      color: #efeefd;
+      box-shadow: 0 0 100px 30px #2bc3f177 inset;
+      font-family:'Montserrat',sans-serif;
     }}
     .title {{
-      font-family:'Montserrat'; font-size:2.4em; color:#fff; text-align:center; font-weight:900; margin:12px 0 8px 0; letter-spacing:.8px;
-      background:linear-gradient(93deg,#00c3ff 14%,#ff9800 88%);
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
-      text-shadow:0 3px 30px #191b3a60;
-    }}
-    .description {{
-      font-size:1.07em; color:#f8f8ff; text-align:center; margin-bottom:16px; opacity:.97;
-      font-family:'Montserrat'; font-weight:600;
+      font-family:'Montserrat',sans-serif;
+      font-size:2.7em;
+      font-weight:900;
+      color:#fff;
+      text-align:center;
+      margin:0 0 18px 0;
+      letter-spacing:.8px;
+      background: linear-gradient(98deg,#00e3ff 11%,#ff9800 91%);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+      background-clip:text;
+      text-shadow:0 3px 33px #141a2d66;
     }}
     .ai-tips {{
-      background:rgba(255,255,255,0.09);
-      color:#ffe47a; border-radius:25px; padding:12px 22px 13px 24px; font-size:1.07em;
-      font-family:'Montserrat'; font-weight:700; text-align:center; max-width:550px;margin:10px auto 18px auto;
-      border:1.2px solid #00c2ef23;
-      text-shadow:0 1px 8px #1c418f14;
+      background: rgba(0,255,185,0.13);
+      color: #ffe28c;
+      border-radius:22px;
+      padding:13px 25px;
+      font-size:1.21em;
+      font-family:'Montserrat', sans-serif;
+      font-weight: 800;
+      text-align:center;
+      max-width:550px;
+      margin:12px auto 17px auto;
+      border:1.6px solid #00b0ee44;
+      box-shadow:0 2px 9px #1ad4ff44;
+      animation: tipswap 4s infinite alternate;
+    }}
+    @keyframes tipswap {{
+      0%{{box-shadow:0 2px 19px #ffe6c43b;}}
+      100%{{box-shadow:0 7px 32px #7efffb3d;}}
+    }}
+    .section-title-accent {{
+      font-size:1.33em;
+      font-weight:900;
+      letter-spacing:1.3px;
+      padding: 0 7px 0 0;
+      display:inline-block;
+      background:linear-gradient(92deg,#00eaff 21%,#ffb963 100%);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+      text-shadow:0 2px 19px #6b9db1ba;
+      margin-bottom:7px;
     }}
     .glass-wrap {{
-      background: rgba(41,51,92,0.88); border-radius:22px; box-shadow: 0 3px 24px 7px #00c3ff14;
-      margin:21px auto 10px auto; max-width:930px;
-      padding: 20px 30px 15px 24px; border:1.65px solid #ffb86c22; backdrop-filter: blur(8px) saturate(127%);
+      background: rgba(41,51,92,0.89);
+      border-radius:24px;
+      box-shadow:0 10px 38px 6px #05d7ff19;
+      margin:19px auto 12px auto;
+      max-width:970px;
+      padding:26px 33px 17px 28px;
+      border:1.5px solid #ffcd683a;
+      backdrop-filter: blur(8px) saturate(122%);
+      transition: box-shadow 0.38s, transform 0.19s;
+      perspective: 600px;
     }}
-    .generated-info, .translations {{
-      font-size:1.15em; font-family:'Montserrat',sans-serif;
-      color:#f4f1fd; background:rgba(23,30,52,0.97); border-radius:13px;
-      border: 1.2px solid #00c3ff2a; box-shadow:0 2px 9px 0 #2c536452;
-      margin-bottom:10px; padding:16px 20px 12px 15px; word-break:break-word; line-height:1.6;
-      overflow-wrap:break-word; max-height:none;
+    .glass-wrap:hover {{
+      box-shadow:0 0 66px 15px #00eaffcc,0 0 26px 9px #ffc34d30;
+      transform: scale(1.018) rotateY(2.7deg) rotateX(1.5deg);
     }}
-    .copy-btn {{
-      background:linear-gradient(96deg,#00c3ff 50%,#ff9800 100%);
-      color:#fff; border:none; padding: 6px 15px; border-radius: 16px;
-      font-family:'Montserrat'; font-size:1em; font-weight:700;
-      cursor:pointer; margin-left:10px; margin-bottom:3px;
-      transition: background .18s, transform .10s;
-      box-shadow:0 1px 5px #00c3ff17;
+    .shimmer {{
+      background: linear-gradient(90deg, #23294c 25%, #28356f 50%, #23294c 75%);
+      background-size: 400% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 14px;
+      height: 52px;
+      margin:12px 0 9px 0;
     }}
-    .copy-btn:active {{
-      background:linear-gradient(96deg,#ff9800 10%,#00c3ff 90%);
-      transform:scale(.98);
+    @keyframes shimmer {{
+      0%   {{ background-position: -400px 0; }}
+      100% {{ background-position: 400px 0; }}
     }}
-    .language-caption {{
-      color:#ff9800; font-weight:700; font-size:1.10em; margin-bottom:6px; letter-spacing:0.018em;
+    .avatar-ai {{
+      border-radius:50%;
+      box-shadow:0 0 36px 4px #17efe57a, 0 0 76px 0 #00ffa766;
+      margin:9px auto 0 auto; display:block;
+      border:3px solid #704ae8cc;
+      width:95px; height:95px;
+      background: linear-gradient(120deg,#0bf0e4 45%,#f6d54e 92%);
+      animation: aiavatarfloat 2.6s ease-in-out infinite alternate;
+      cursor: pointer;
     }}
-    .voice-glow {{
-      background:linear-gradient(90deg,#fff7,#ffd58cfa); border-radius:27px;
-      box-shadow:0 0 19px 8px #ffd58c22,0 0 21px 11px #ff980014;
-      padding:10px 15px 9px 15px; margin:8px 0 0 0; text-align:center;
-      font-weight:700; font-size:1.07em; color:#191a1d;
+    @keyframes aiavatarfloat {{
+      0%   {{ transform: translateY(-8px) scale(1.01);  }}
+      100% {{ transform: translateY(7.5px) scale(1.075); }}
     }}
-    .caption {{
-      color:#ffe18c; text-align:center; background:linear-gradient(99deg,#00c3ff39,#ffb06d31 60%,#ff98003b 100%);
-      border-radius:13px; font-size:1.05em; margin:22px 0 10px 0; padding:8px 0 11px 0;
-      font-family:'Montserrat'; font-weight:700; letter-spacing:.021em;
-      text-shadow:0 2.3px 13px #00c3ff24; box-shadow:0 2px 13px #ff980018;
+    .ai-avatar-tooltip {{
+      text-align:center;
+      margin-top:7px;
+      font-size:1em;
+      color:#ffd666cc;
+      letter-spacing:.7px;
+    }}
+    .footer-caption {{
+      text-align:center;
+      color:#ffe7bb;
+      font-family:'Montserrat',sans-serif;
+      font-size:1.09em;
+      margin-top:13px;
+      font-weight:500;
+      letter-spacing:.2px;
+    }}
+    .footer-caption .ai-emoji {{
+      animation: pulseaiemoji 2.7s infinite;
+      font-size:1.22em;
+      filter: drop-shadow(0 2px 6px #ffe965b9);
+      margin-right:7px;
+    }}
+    @keyframes pulseaiemoji {{
+      0% {{ scale:1; filter: drop-shadow(0 2px 6px #ffefbb85);}}
+      100%{{ scale:1.10; filter: drop-shadow(0 5px 12px #ffeb9187);}}
     }}
     .stButton>button {{
-      background:linear-gradient(87deg,#00c3ff 37%,#ff9800 99%);
-      color:#fff; border:none; padding:12px 27px; border-radius:17px;
-      font-size:1.13em; font-family:'Montserrat'; font-weight:700;
-      margin-bottom:13px;margin-top:11px; cursor:pointer;
-      box-shadow:0 0 13px 2px #00c3ff1e;
-      transition:transform 0.12s,box-shadow 0.13s,background 0.18s;
+      background:linear-gradient(90deg,#00eefe 17%,#ffba69 96%);
+      color: #fff; border:none; border-radius:17px;
+      font-size: 1.13em;font-weight:800;
+      padding:12px 27px;
+      margin-bottom:5px;margin-top:12px;cursor:pointer;
+      box-shadow:0 0 18px 2px #00c3ff36;
+      transition:box-shadow 0.195s, background 0.16s, transform 0.15s;
+      outline:0;
+      position:relative;
+      overflow:hidden;
     }}
-    .stButton>button:hover {{
-      background:linear-gradient(87deg,#ff9800 12%,#00c3ff 100%)!important;
-      color:#27292d; transform:scale(1.045);
-      box-shadow:0 0 25px 6px #ff98003e,0 0 5px 1px #00c3ff27;
+    .stButton>button:active {{
+      background:linear-gradient(90deg,#ffc54d 4%,#01e5ff 93%);
+      box-shadow:0 0 66px 11px #00d1ffd0;
+      transform:scale(0.98);
     }}
-    .stSelectbox>div>div, .stTextInput>div>div>input{{
-      background:rgba(30,34,55,0.68)!important; color:#fff !important;
-      border-radius:10px; font-family:'JetBrains Mono',monospace;
-      font-size:1.04em; font-weight:500; padding-left:11px;
+    .user-bubble, .ai-bubble {{
+      margin:12px 2px;padding:10px 20px;border-radius:18px;
+      max-width:83%;display:inline-block;
+      font-size:1.08em;line-height:1.54;
     }}
-    .stAudio audio {{ width:96% !important; margin:9px 0 7px 0; border-radius:6px; }}
-    .stImage img {{
-      border-radius:16px; box-shadow:0 2px 13px 0 #ff980041,0 0 13px 4px #00c3ff13;
-      margin-top:6px; margin-bottom:0.38em; border:1.5px solid #00c3ff3b;
-      background:#fff; object-fit:cover; filter:saturate(1.06) brightness(1.02);
+    .user-bubble {{background:#19fcdf33;color:#fffcc0;margin-left:26%;text-align:right;}}
+    .ai-bubble   {{background:#4257fa2d;color:#ede6ff;}}
+    .toast-pop {{
+      position:fixed;bottom:35px;right:25px;
+      background:linear-gradient(89deg,#1be7ba 6%,#ffde98 92%);
+      color:#242433;box-shadow:0 8px 38px #32eeff5a;
+      border-radius:12px;font-size:1.13em;padding:12px 26px;z-index:999;
+      animation:toast-in .8s cubic-bezier(.24,1.22,.78,1) 1;
     }}
-    .stInfo {{
-      background:rgba(255,255,255,0.16)!important; border-radius:7px; font-size:.98em;
-      color:#faf6ea; margin-bottom: 7px; padding:6px 15px; font-family:'Montserrat',monospace;
+    @keyframes toast-in {{
+      from {{transform:translateX(128px) scale(.7);opacity:0; }}
+      to   {{transform:translateX(0) scale(1);opacity:1; }}
+    }}
+    .progress-glow {{
+      margin:19px 0 13px 0;height:9px;
+      background:linear-gradient(90deg,#16f1ff,#ffc661);
+      border-radius:8px;box-shadow:0 0 17px 4px #19e6ffa9;
+      position:relative;overflow:hidden;
+    }}
+    .progress-glow-bar {{
+      width:0%;height:100%;
+      animation:barprog 2.9s cubic-bezier(.25,.1,.37,1.52) infinite alternate;
+      background:linear-gradient(90deg,#ffe969,#06fde9);
+    }}
+    @keyframes barprog {{
+      0%{{width:22%;}}
+      100%{{width:96%;}}
+    }}
+    details.adv-panel {{
+      margin:14px 0 0 0;
+      background: linear-gradient(98deg,#06cdfc14 2%,#ffc75a2c 94%);
+      border-radius:17px;padding:15px 17px;
+      box-shadow:0 2px 15px #0afcf218;
+      border:1.2px solid #fbc05ac0;
+      font-size:1.08em;
+      color:#ffe29c;
+      font-family:'Montserrat';
+    }}
+    summary.adv-title {{
+      font-weight:900; font-size:1.09em; color:#fff6b5; letter-spacing:.7px; cursor:pointer;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -148,14 +262,14 @@ def get_language_code(lang_display):
 def is_voice_supported(code):
     return code in tts_supported
 
-def llama70b(prompt):
+def llama70b(history):
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     data = {
         "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": prompt}]
+        "messages": history
     }
     try:
         r = requests.post(GROQ_URL, json=data, headers=headers, timeout=90)
@@ -187,85 +301,224 @@ def synthesize_speech(text, code):
         print(f"Voice error ({code}): {e}")
         return None
 
-def fetch_pexels_image(query):
+def fetch_pexels_video(query):
     if not PEXELS_API_KEY:
         return None
     headers = {'Authorization': PEXELS_API_KEY}
-    url = f"https://api.pexels.com/v1/search?query={query}&per_page=1"
+    params = {'query': query, 'per_page': 1}
     try:
-        resp = requests.get(url, headers=headers, timeout=20)
+        resp = requests.get("https://api.pexels.com/videos/search", headers=headers, params=params, timeout=12)
         data = resp.json()
-        if data.get('photos'):
-            return data['photos'][0]['src']['original']
+        if data.get('videos') and data['videos'][0]['video_files']:
+            mp4s = [f for f in data['videos'][0]['video_files'] if f['file_type'] == 'video/mp4']
+            if mp4s:
+                mp4s.sort(key=lambda x: x['width'] * x['height'], reverse=True)
+                return mp4s[0]['link']
     except Exception as e:
-        print(f"Pexels error: {e}")
-    return None
-
-def fetch_unsplash_image(query):
-    if not UNSPLASH_KEY:
-        return None
-    url = f"https://api.unsplash.com/photos/random?query={query}&client_id={UNSPLASH_KEY}"
-    try:
-        resp = requests.get(url, timeout=20)
-        data = resp.json()
-        image_url = data.get('urls', {}).get('regular')
-        return image_url
-    except Exception as e:
-        print(f"Unsplash error: {e}")
+        print(f"Pexels video error: {e}")
     return None
 
 def fetch_best_image(query):
-    pexels_img = fetch_pexels_image(query)
-    if pexels_img:
-        return pexels_img
-    unsplash_img = fetch_unsplash_image(query)
-    return unsplash_img
+    url = f"https://api.pexels.com/v1/search?query={query}&per_page=1"
+    if PEXELS_API_KEY:
+        headers = {"Authorization": PEXELS_API_KEY}
+        try:
+            r = requests.get(url, headers=headers, timeout=12)
+            data = r.json()
+            if data.get('photos'):
+                return data['photos'][0]['src']['original']
+        except Exception as e:
+            print(f"Image error: {e}")
+    if UNSPLASH_KEY:
+        try:
+            url = f"https://api.unsplash.com/photos/random?query={query}&client_id={UNSPLASH_KEY}"
+            r = requests.get(url, timeout=12)
+            data = r.json()
+            return data.get('urls', {}).get('regular')
+        except Exception as e:
+            print(f"Unsplash image error: {e}")
+    return None
+
+def fetch_default_youtube(query):
+    topics = {
+        "python": "https://www.youtube.com/embed/rfscVS0vtbw",
+        "artificial intelligence": "https://www.youtube.com/embed/2ePf9rue1Ao",
+        "machine learning": "https://www.youtube.com/embed/IpGxLWOIZy4",
+        "biology": "https://www.youtube.com/embed/BjX4fHq-v3g",
+        "science": "https://www.youtube.com/embed/X1eGxJdPMu8",
+        "mathematics": "https://www.youtube.com/embed/Trvv7bSHy9Y",
+        "neural network": "https://www.youtube.com/embed/aircAruvnKk"
+    }
+    for k, v in topics.items():
+        if k in query.lower():
+            return v
+    return "https://www.youtube.com/embed/0p2RV5q5hOs"
+
+def get_geolocation():
+    try:
+        res = requests.get("https://ipinfo.io/json", timeout=6)
+        data = res.json()
+        if "loc" in data:
+            lat, lon = data["loc"].split(",")
+            return float(lat), float(lon), data
+    except Exception as e:
+        print("Geolocation error", e)
+    return None, None, {}
+
+def show_live_map(lat, lon):
+    m = folium.Map(location=[lat, lon], zoom_start=12, control_scale=True)
+    folium.Marker([lat, lon], popup="You are here", icon=folium.Icon(color="red")).add_to(m)
+    st_folium(m, width=700, height=400)
+
+def show_toast(msg, icon="✔️"):
+    st.markdown(f"<div class='toast-pop'>{icon}&nbsp;{msg}</div>", unsafe_allow_html=True)
 
 def main():
     add_custom_styles()
-    st.markdown(f'<div class="title">{add_emojis("AI Multilanguage Assistant {title_emoji}")}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="description">Modern AI: 200+ languages, smart images, full-voice, glass UI, and vibrant feel for all answers.</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="ai-tips">{random.choice(TIP_LIST)}</div>', unsafe_allow_html=True)
-    with st.form("prompt-form", clear_on_submit=False):
-        query = st.text_input("🔎 Enter your query here:")
-        language_select = st.selectbox("🌐 Choose language (voice/text):", ALL_LANGUAGE_CHOICES, index=0)
-        submit = st.form_submit_button("✨ Generate", use_container_width=True)
-    code = get_language_code(language_select)
-    can_voice = is_voice_supported(code)
-    if submit:
-        with st.spinner("Generating..."):
-            ai_answer = llama70b(query)
-            translation = translate_text(ai_answer, code)
-            img_url = fetch_best_image(query)
-        # --- Rich output (never scrolls, always fully visible) ---
-        st.markdown(f'<div class="glass-wrap generated-info"><b>📜 Answer:</b><br><span style="font-size:1.04em;line-height:1.56;">{ai_answer}</span></div>', unsafe_allow_html=True)
-        st.button("📋 Copy AI Answer", on_click=lambda: st.session_state.update({'ai_answer': ai_answer}), key="copyai")
+    col_ai, col_t = st.columns([1, 8])
+    with col_ai:
+        st.image(
+            "https://cdn-icons-png.flaticon.com/512/4712/4712102.png",
+            width=95,
+            output_format="PNG",
+            caption="",
+            use_container_width=False,
+        )
+        st.markdown('<div class="avatar-ai" title="AI Assistant"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="ai-avatar-tooltip">AI Assistant</div>', unsafe_allow_html=True)
+    with col_t:
         st.markdown(
-            f"""<div class="glass-wrap translations"><div>
-            <span class="language-caption">{add_emojis("{language_emoji}")} {translator_supported.get(code, code.upper())}</span><br>
-            <span style="font-size:1.02em;line-height:1.56;">{translation}</span></div></div>""",
+            f'<div class="title">{add_emojis("AI Multilanguage Assistant {title_emoji}")}'
+            f'</div>', unsafe_allow_html=True)
+        if LOTTIE_AVAILABLE:
+            st_lottie("https://assets7.lottiefiles.com/packages/lf20_3rwasyjy.json", width=108, key="ai_lottie")
+        st.markdown(
+            f'<div class="ai-tips" id="animatedtip">{random.choice(TIP_LIST)}</div>',
             unsafe_allow_html=True
         )
-        st.button("📋 Copy Translation", on_click=lambda: st.session_state.update({'translation': translation}), key="copytrans")
-        cols = st.columns([2, 1])
-        with cols[0]:
-            if can_voice:
-                st.markdown('<div class="voice-glow">🔊 Voice Output (Click Play Below):</div>', unsafe_allow_html=True)
-                audio = synthesize_speech(translation, code)
-                if audio:
-                    st.audio(audio, format='audio/mp3')
+
+    st.markdown('<span class="section-title-accent">🌍 Your Live Location on Google Map</span>', unsafe_allow_html=True)
+    lat, lon, geoinfo = get_geolocation()
+    if lat and lon:
+        show_live_map(lat, lon)
+        st.info(f"🔹 Your detected city: **{geoinfo.get('city','')} ({geoinfo.get('country','')})** | IP: {geoinfo.get('ip','')}")
+    else:
+        st.warning("Couldn't detect your location. You might be behind a VPN or firewall.")
+
+    if 'chat_history' not in st.session_state:
+        st.session_state['chat_history'] = []
+    if 'query_history' not in st.session_state:
+        st.session_state['query_history'] = []
+
+    # --- ADDITION: "How can I help you?" chatbot welcome ---
+    if len(st.session_state['chat_history']) == 0:
+        welcome_msg = "Hello! 👋 How can I help you today?"
+        st.session_state['chat_history'].append({"role": "assistant", "content": welcome_msg})
+
+    st.markdown('<span class="section-title-accent">🤔 Ask the AI Any Question or Have a Chat</span>', unsafe_allow_html=True)
+    with st.form("prompt-form", clear_on_submit=False):
+        query = st.text_input("🔎 Enter your message for the chat AI:")
+        language_select = st.selectbox("🌐 Choose language (voice/text):", ALL_LANGUAGE_CHOICES, index=0)
+        submit = st.form_submit_button("✨ Send", use_container_width=True)
+
+    code = get_language_code(language_select)
+    can_voice = is_voice_supported(code)
+
+    with st.sidebar:
+        st.header("📚 Query History")
+        for q in st.session_state['query_history'][-8:][::-1]:
+            st.markdown(f"- {q}")
+        st.write("---")
+        st.markdown("<span style='color:#fdc55e'>[More settings coming soon]</span>", unsafe_allow_html=True)
+
+    # Main Chat Logic
+    if submit and query:
+        st.session_state['query_history'].append(query)
+        st.session_state['chat_history'].append({"role": "user", "content": query})
+        st.markdown("""
+        <div class="progress-glow">
+            <div class="progress-glow-bar"></div>
+        </div>
+        """, unsafe_allow_html=True)
+        with st.spinner("AI is thinking..."):
+            st.markdown('<div class="shimmer"></div>', unsafe_allow_html=True)
+            # Build conversation history for Groq
+            convo = [{"role": e["role"], "content": e["content"]} for e in st.session_state["chat_history"]]
+            ai_answer = llama70b(convo)
+            st.session_state['chat_history'].append({"role": "assistant", "content": ai_answer})
+
+            # These assets are generated for the last assistant response
+            translation = translate_text(ai_answer, code)
+            img_url = fetch_best_image(query)
+            video_url = fetch_pexels_video(query)
+            yt_url = fetch_default_youtube(query)
+            st.session_state['last_translation'] = translation
+            st.session_state['last_img'] = img_url
+            st.session_state['last_video'] = video_url
+            st.session_state['last_yt'] = yt_url
+
+    # Render Full Chat
+    for entry in st.session_state['chat_history']:
+        msg_cls = "user-bubble" if entry['role'] == "user" else "ai-bubble"
+        st.markdown(f'<div class="{msg_cls}">{entry["content"]}</div>', unsafe_allow_html=True)
+
+    # Output Cards
+    if st.session_state.get('chat_history') and any(e['role'] == 'assistant' for e in st.session_state['chat_history']):
+        cp1, cp2 = st.columns(2)
+        with cp1:
+            if st.button("📋 Copy Last AI Answer", key="copyai", use_container_width=True):
+                st.session_state['copyai'] = st.session_state['chat_history'][-1]['content']
+                show_toast("Copied last answer!")
+            if st.button("📋 Copy Last Translation", key="copytrans", use_container_width=True):
+                st.session_state['copytrans'] = st.session_state.get('last_translation', '')
+                show_toast("Copied last translation!")
+            last_ai = [e for e in st.session_state['chat_history'] if e['role'] == 'assistant']
+            if last_ai:
+                translation = st.session_state.get('last_translation', translate_text(last_ai[-1]['content'], code))
+                st.markdown(
+                    f"""<div class="glass-wrap translations">
+                    <span class="language-caption">{add_emojis("{language_emoji}")} {translator_supported.get(code, code.upper())}</span><br>
+                    <span style="font-size:1.07em;line-height:1.53;">{translation}</span></div>""",
+                    unsafe_allow_html=True)
+                if can_voice:
+                    st.markdown('<div class="voice-glow">🔊 Voice Output (Play Below):</div>', unsafe_allow_html=True)
+                    audio = synthesize_speech(translation, code)
+                    if audio:
+                        st.audio(audio, format='audio/mp3')
+                    else:
+                        st.info("Sorry, there was a problem generating voice for this text/language.")
                 else:
-                    st.info("Sorry, there was a problem generating voice for this text/language.")
-            else:
-                st.info("Sorry, voice not available for this language (Google TTS doesn't support it).")
-        with cols[1]:
+                    st.info("Sorry, voice not available for this language.")
+            st.markdown('<span class="section-title-accent">🎬 Related Video / Animation</span>', unsafe_allow_html=True)
+            video_url = st.session_state.get('last_video')
+            yt_url = st.session_state.get('last_yt')
+            if video_url:
+                st.video(video_url)
+            elif yt_url:
+                st.video(yt_url)
+        with cp2:
+            img_url = st.session_state.get('last_img')
             if img_url:
                 st.image(img_url, caption="Related image", use_container_width=True)
             else:
                 st.info("No related image found for your query.")
-        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <details class="adv-panel">
+        <summary class="adv-title">Advanced & Extras</summary>
+        <ul>
+            <li>🚀 <b>Tip</b>: Try rich, scientific, historic and language learning prompts.</li>
+            <li>🦾 <b>Coming soon</b>: Theme switch, AI avatar emotions, even more media sources, and analytics!</li>
+        </ul>
+    </details>
+    """, unsafe_allow_html=True)
+
     st.markdown(
-        f'<div class="caption">Made with {add_emojis("{creator_emoji}")} by Raghavendra N . Bright Minds Academy <span>Contact: <a style="color:#ffe28c" href="mailto:info@brightmindsacademy.com">info@brightmindsacademy.com</a></span></div>',
+        '''<div class="footer-caption">
+            <span class="ai-emoji">🤖</span>
+            Made with by Raghavendra N | Bright Minds Academy<br>
+            <span>Contact: <a style="color:#ffe28c" href="mailto:info@brightmindsacademy.com">info@brightmindsacademy.com</a></span>
+        </div>''',
         unsafe_allow_html=True
     )
 
